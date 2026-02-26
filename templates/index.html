@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-агент тестирования | Прототип с API</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --glow-primary: rgba(99, 102, 241, 0.4);
+            --glow-secondary: rgba(236, 72, 153, 0.3);
+            --glow-success: rgba(34, 197, 94, 0.3);
+        }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: 
+                radial-gradient(circle at 20% 80%, var(--glow-primary) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, var(--glow-secondary) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, var(--glow-success) 0%, transparent 50%),
+                linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #16213e 100%);
+            color: white; 
+            min-height: 100vh; 
+            overflow-x: hidden;
+        }
+        .glass { 
+            backdrop-filter: blur(40px) saturate(180%); 
+            background: var(--glass-bg); 
+            border: 1px solid var(--glass-border); 
+            box-shadow: 0 25px 50px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-hover:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 35px 70px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+            border-color: rgba(255,255,255,0.3);
+        }
+        .glow { position: absolute; border-radius: 50%; filter: blur(120px); z-index: -1; animation: pulse-glow 8s ease-in-out infinite; }
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        .gradient-text { 
+            background: linear-gradient(135deg, #ffffff 0%, #e0f2fe 30%, #c7d2fe 70%, #e0e7ff 100%);
+            background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .progress-fill { background: linear-gradient(90deg, #10b981, #34d399, #6ee7b7); }
+        .api-status { 
+            background: linear-gradient(90deg, #10b981, #059669); 
+            animation: pulse 2s infinite; 
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+    </style>
+</head>
+<body class="p-4 sm:p-6 lg:p-12">
+
+    <!-- Статус API -->
+    <div id="api-status" class="fixed top-4 right-4 z-50 glass px-4 py-2 rounded-2xl text-xs font-medium text-emerald-300 hidden">
+        🔌 Подключён к AI API
+    </div>
+
+    <div class="glow w-[400px] h-[400px] bg-[rgba(99,102,241,0.4)] top-[-15%] left-[-15%]"></div>
+    <div class="glow w-[500px] h-[500px] bg-[rgba(236,72,153,0.3)] bottom-[-25%] right-[-20%] animation-delay-[-2s]"></div>
+    <div class="glow w-[300px] h-[300px] bg-[rgba(34,197,94,0.3)] top-[60%] left-[10%] animation-delay-[-4s]"></div>
+
+    <div class="max-w-6xl mx-auto">
+        <header class="glass rounded-3xl p-8 mb-12 text-center glass-hover">
+            <div class="w-20 h-20 bg-gradient-to-br from-indigo-400/40 to-purple-400/40 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl ring-2 ring-white/20">
+                <svg class="w-12 h-12 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg>
+            </div>
+            <h1 class="text-4xl lg:text-5xl font-light tracking-tight mb-4 gradient-text">AI-агент тестирования</h1>
+            <p class="text-xl text-white/60 font-light max-w-2xl mx-auto">Полная интеграция с бэкендом: реальная генерация тестов + AI-наставничество</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-8">
+                
+                <div id="auth-section" class="glass rounded-3xl p-10 lg:p-12 glass-hover">
+                    <div class="text-center mb-10">
+                        <h2 class="text-3xl font-light mb-2 gradient-text">Войти в систему</h2>
+                        <p class="text-white/50">Начните персонализированное обучение</p>
+                    </div>
+                    <form id="login-form" class="space-y-6">
+                        <input type="email" id="student-email" placeholder="student@example.com" required
+                               class="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-2xl text-lg backdrop-blur-sm focus:border-indigo-400/50 outline-none transition-all placeholder-white/40 font-light">
+                        <button type="submit" class="w-full py-6 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold rounded-2xl text-lg shadow-2xl hover:scale-[1.02] transition-all">🔐 Войти и начать тест</button>
+                    </form>
+                </div>
+
+                <div id="subject-section" class="glass rounded-3xl p-10 lg:p-12 hidden glass-hover">
+                    <div class="flex items-center gap-4 mb-10">
+                        <div class="w-12 h-12 bg-emerald-400/20 rounded-2xl flex items-center justify-center animate-pulse">
+                            <svg class="w-7 h-7 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-light gradient-text">Выберите предмет</h2>
+                            <p class="text-white/50 text-sm" id="welcome-student"></p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                        <select id="subject-select" class="w-full px-6 py-5 bg-white/10 border border-white/20 rounded-2xl text-lg backdrop-blur-sm font-light outline-none">
+                            <option value="mathematics">🔢 Математика</option>
+                            <option value="programming">💻 Программирование</option>
+                            <option value="english">📖 Английский</option>
+                        </select>
+                        <select id="level-select" class="w-full px-6 py-5 bg-white/10 border border-white/20 rounded-2xl text-lg backdrop-blur-sm font-light outline-none">
+                            <option value="beginner">Начинающий</option>
+                            <option value="intermediate">Средний</option>
+                            <option value="advanced">Продвинутый</option>
+                        </select>
+                    </div>
+                    <button onclick="generateTest()" class="w-full py-6 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold rounded-2xl text-lg shadow-2xl hover:scale-[1.02] transition-all">🤖 Сгенерировать тест AI</button>
+                </div>
+
+                <div id="test-section" class="hidden">
+                    <div class="glass rounded-3xl p-10 lg:p-12 glass-hover relative">
+                        <div id="test-loading" class="absolute inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 hidden">
+                            <div class="text-center"><div class="animate-spin w-12 h-12 border-4 border-white/20 border-t-indigo-400 rounded-full mx-auto mb-4"></div><p class="text-white/80">AI генерирует вопросы...</p></div>
+                        </div>
+                        <div class="flex justify-between items-center mb-10">
+                            <div>
+                                <p class="text-sm uppercase text-white/50 font-medium">Тест: <span id="test-subject" class="gradient-text font-semibold"></span></p>
+                                <span class="text-2xl font-light gradient-text" id="question-counter">1 / 5</span>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-3xl font-bold gradient-text" id="timer">15:00</div>
+                                <p class="text-xs text-white/50 uppercase">осталось</p>
+                            </div>
+                        </div>
+                        <div id="question-container" class="min-h-[400px] flex flex-col justify-center">
+                            <h3 class="text-2xl lg:text-3xl font-light mb-12 text-center gradient-text" id="question-text">Загрузка...</h3>
+                            <div id="answers-container" class="space-y-4 max-w-3xl mx-auto w-full"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="results-section" class="hidden">
+                    <div class="glass rounded-3xl p-12 text-center glass-hover">
+                        <div class="w-28 h-28 bg-gradient-to-br from-emerald-400/40 to-teal-400/40 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl animate-bounce">
+                            <svg class="w-14 h-14 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <h2 class="text-6xl font-extralight mb-4 gradient-text" id="final-score">0%</h2>
+                        <p class="text-xl text-white/60 mb-12" id="score-text">Ваш результат</p>
+                        <div class="bg-white/5 border border-white/10 rounded-3xl p-10 mb-12">
+                            <h3 class="text-xl font-medium mb-4 flex items-center gap-3 gradient-text">AI-наставник:</h3>
+                            <div id="ai-feedback" class="text-white/80 text-lg leading-relaxed">Анализируем...</div>
+                        </div>
+                        <button onclick="location.reload()" class="w-full py-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl font-semibold shadow-2xl hover:scale-[1.02] transition-all">🔄 Новый тест</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-8">
+                <div class="glass rounded-3xl p-8 lg:p-10 sticky top-8">
+                    <h3 class="text-xl font-light gradient-text mb-8">Live аналитика</h3>
+                    <div class="grid grid-cols-2 gap-6 p-8 bg-white/5 rounded-2xl border border-white/10 mb-8">
+                        <div><div id="students-count" class="text-3xl font-bold gradient-text mb-2">0</div><div class="text-xs uppercase text-white/50">Студентов</div></div>
+                        <div><div id="avg-score" class="text-3xl font-bold gradient-text mb-2">0%</div><div class="text-xs uppercase text-white/50">Успеваемость</div></div>
+                    </div>
+                    <button onclick="loadTeacherStats()" class="w-full py-4 bg-orange-500 rounded-xl font-semibold transition-all">📈 Обновить данные</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null, currentTest = null, testTimer = null, timeLeft = 900;
+        let correctAnswersCount = 0, currentQuestionIndex = 0;
+
+        window.addEventListener('load', () => {
+            loadTeacherStats(); 
+            fetch('/health').then(r => r.ok && document.getElementById('api-status').classList.remove('hidden'));
+        });
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('student-email').value;
+            const res = await fetch('/register', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email})});
+            currentUser = await res.json();
+            document.getElementById('welcome-student').textContent = `Привет, ${currentUser.name}!`;
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('subject-section').classList.remove('hidden');
+        });
+
+        async function generateTest() {
+    const subject = document.getElementById('subject-select').value;
+    const level = document.getElementById('level-select').value;
+    
+    // Скрываем выбор, показываем загрузку
+    document.getElementById('subject-section').classList.add('hidden');
+    document.getElementById('test-section').classList.remove('hidden');
+    document.getElementById('test-loading').classList.remove('hidden');
+
+    try {
+        const res = await fetch('/generate_test', {
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({subject, level, userId: currentUser.email})
+        });
+
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.detail || "Ошибка сервера");
+        }
+
+        const data = await res.json();
+        currentTest = { subject, questions: data.questions };
+        document.getElementById('test-subject').textContent = subject.toUpperCase();
+        document.getElementById('test-loading').classList.add('hidden');
+        startTest();
+
+    } catch (e) {
+        // ОШИБКА: Больше не перезагружаем страницу!
+        console.error("Генерация провалена:", e);
+        document.getElementById('test-loading').classList.add('hidden');
+        document.getElementById('test-section').classList.add('hidden');
+        document.getElementById('subject-section').classList.remove('hidden');
+        
+        // Показываем пользователю, что случилось
+        alert("⚠️ " + e.message);
+    }
+}
+
+        function startTest() {
+            currentQuestionIndex = 0; correctAnswersCount = 0;
+            renderCurrentQuestion();
+            testTimer = setInterval(() => {
+                timeLeft--;
+                const min = Math.floor(timeLeft/60), sec = timeLeft%60;
+                document.getElementById('timer').textContent = `${min}:${sec.toString().padStart(2,'0')}`;
+                if (timeLeft <= 0) endTest();
+            }, 1000);
+        }
+
+        function renderCurrentQuestion() {
+            const q = currentTest.questions[currentQuestionIndex];
+            document.getElementById('question-counter').textContent = `${currentQuestionIndex + 1} / ${currentTest.questions.length}`;
+            document.getElementById('question-text').textContent = q.question;
+            const container = document.getElementById('answers-container');
+            container.innerHTML = '';
+            
+            q.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'glass w-full py-6 px-8 rounded-2xl text-left hover:bg-white/10 transition-all text-lg font-light';
+                btn.textContent = opt;
+                btn.onclick = () => {
+                    // ИСПОЛЬЗУЕМ == ДЛЯ ПОДДЕРЖКИ СТРОК И ЧИСЕЛ ОТ ИИ
+                    if (idx == q.correctIndex) correctAnswersCount++;
+                    currentQuestionIndex++;
+                    if (currentQuestionIndex < currentTest.questions.length) renderCurrentQuestion();
+                    else endTest();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+       async function endTest() {
+    clearInterval(testTimer);
+
+    document.getElementById('test-section').classList.add('hidden');
+    document.getElementById('results-section').classList.remove('hidden');
+
+    const total = currentTest.questions.length || 1;
+    const score = Math.round((correctAnswersCount / total) * 100);
+
+    document.getElementById('final-score').textContent = score + '%';
+    document.getElementById('ai-feedback').innerHTML = "Анализируем результаты...";
+
+    try {
+        const response = await fetch('/analyze_results', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                score: score,
+                subject: currentTest.subject,
+                email: currentUser.email
+            })
+        });
+
+        const data = await response.json();
+        document.getElementById('ai-feedback').innerHTML = data.feedback;
+
+        loadTeacherStats();
+
+    } catch (error) {
+        console.error(error);
+        document.getElementById('ai-feedback').innerHTML =
+            "Совет временно недоступен.";
+    }
+}
+async function loadTeacherStats() {
+    try {
+        const res = await fetch('/get_teacher_stats');
+        if (!res.ok) throw new Error('Stats error');
+        
+        const data = await res.json();
+        
+        document.getElementById('students-count').textContent = data.studentCount;
+        document.getElementById('avg-score').textContent = data.avgScore + '%';
+    } catch (err) {
+        console.error('Ошибка загрузки статистики:', err);
+    }
+}
+    </script>
+</body>
+</html>
